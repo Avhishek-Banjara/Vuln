@@ -14,6 +14,9 @@ This project is a minimalist, extensible vulnerability scanner framework designe
 # Disclaimer
 This tool is for educational purposes only. Use it only on systems you own or have explicit permission to test. Unauthorized scanning may be illegal.
 
+# Installation
+pipx install vuln
+
 # Show version
 vuln --version
 
