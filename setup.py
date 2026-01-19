@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "requests",
-        "colorama"# add other libraries if needed
+        "colorama",# add other libraries if needed
     ],
     entry_points={
         "console_scripts": [
