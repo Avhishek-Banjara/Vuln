@@ -500,14 +500,50 @@ def save_results(target, results):
 from . import __version__
 
 def main():
-    parser = argparse.ArgumentParser(description="Advanced Vulnerability Scanner (educational use only)")
-    parser.add_argument("target", help="Target (URL or IP[:port])")
-    parser.add_argument("--modules", nargs="+", choices=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
-                        default=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
-                        help="Modules to run")
-    parser.add_argument("--intrusive", action="store_true", help="Enable intrusive tests (SQLi/XSS)")
-    parser.add_argument("--version", action="version", version=f"vuln {__version__}")
+    def main():
+    parser = argparse.ArgumentParser(
+        prog="vuln",
+        description="Advanced Vulnerability Scanner (educational use only).\n"
+                    "Checks ports, services, headers, SSL/TLS, web vulnerabilities, directory brute force, and CVEs.",
+        epilog="Examples:\n"
+               "  vuln https://example.com\n"
+               "  vuln 192.168.1.10 --modules port ssl\n"
+               "  vuln https://testsite.com --intrusive"
+    )
+    parser.add_argument(
+        "target",
+        help="Target system to scan (URL or IP[:port])"
+    )
+    parser.add_argument(
+        "--modules",
+        nargs="+",
+        choices=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
+        default=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
+        metavar="MODULE",
+        help=(
+            "Modules to run (default: all)\n"
+            "Available modules:\n"
+            "  port        - Port scanning\n"
+            "  fingerprint - Service fingerprinting\n"
+            "  webvuln     - Basic web vulnerability checks\n"
+            "  ssl         - SSL/TLS certificate and protocol checks\n"
+            "  headers     - Security header analysis\n"
+            "  dirbrute    - Directory brute force\n"
+            "  cve         - CVE lookup via NVD API"
+        )
+    )
+    parser.add_argument(
+        "--intrusive",
+        action="store_true",
+        help="Enable intrusive tests (SQLi/XSS heuristics). Use only with permission!"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"vuln {__version__}"
+    )
     args = parser.parse_args()
+    
 
     try:
         target = normalize_target(args.target)
@@ -576,5 +612,6 @@ def main():
         print_ok("No issues found by current checks.")
 
     
+
 
 
