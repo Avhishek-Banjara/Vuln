@@ -669,4 +669,13 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print_err("\nScan interrupted by user.")
+
         sys.exit(1)
+
+from . import __version__
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version", action="version", version=f"vuln {__version__}")
+    args = parser.parse_args()
+    
