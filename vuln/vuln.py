@@ -1,4 +1,5 @@
 from __future__ import annotations
+import argparse
 import socket
 import ssl
 import sys
@@ -679,3 +680,4 @@ def main():
     parser.add_argument("--version", action="version", version=f"vuln {__version__}")
     args = parser.parse_args()
     
+
