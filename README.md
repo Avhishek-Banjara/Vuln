@@ -20,6 +20,16 @@ pipx install vuln
 # Show version
 vuln --version
 
+# Modules
+The scanner is modular, meaning you can run all checks or select specific ones using the --modules option.
+.Port Scan
+. Service Fingerprint 
+. Web Vulnerability
+. SSL/TLS Checks
+. Header Analysis
+. Directory Brute Force
+. CVE Lookup
+
 # Run a full scan
 vuln https://example.com
 
@@ -29,6 +39,8 @@ vuln https://example.com --modules port webvuln ssl
 # Enable intrusive tests (SQLi/XSS heuristics)
 vuln https://example.com --intrusive
 
+# Note 
+This is in early phase (ie 1st version). So if you find any error or any suggestion you can contact me nowhere.
 
 
 
