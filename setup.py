@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "requests"
+        "requests",
         "colorama"# add other libraries if needed
     ],
     entry_points={
