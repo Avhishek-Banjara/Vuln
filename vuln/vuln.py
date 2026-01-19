@@ -307,7 +307,7 @@ def ssl_scan(host, port=443):
         out["error"] = str(e)
     # Check for old protocol support (non-exhaustive)
     proto_support = {}
-    for proto_name, proto in [("SSLv3", ssl.PROTOCOL_TLSv1), ("TLSv1", ssl.PROTOCOL_TLSv1), ("TLSv1_1", getattr(ssl, "PROTOCOL_TLSv1_1", None)), ("TLSv1_2", getattr(ssl, "PROTOCOL_TLSv1_2", None))]:
+    for proto_name, proto in [("TLSv1", ssl.PROTOCOL_TLSv1), ("TLSv1_1", getattr(ssl, "PROTOCOL_TLSv1_1", None)), ("TLSv1_2", getattr(ssl, "PROTOCOL_TLSv1_2", None))]:
         if proto is None:
             continue
         try:
@@ -497,153 +497,64 @@ def save_results(target, results):
         json.dump(results, f, indent=2)
     return fname
 
+from . import __version__
+
 def main():
-    print_status("Advanced Vulnerability Scanner Framework (educational use only)\n", Fore.CYAN)
-    raw = input("Target (URL or IP[:port]): ").strip()
-    if not raw:
-        print_err("No target provided. Exiting.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Advanced Vulnerability Scanner (educational use only)")
+    parser.add_argument("target", help="Target (URL or IP[:port])")
+    parser.add_argument("--modules", nargs="+", choices=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
+                        default=["port","fingerprint","webvuln","ssl","headers","dirbrute","cve"],
+                        help="Modules to run")
+    parser.add_argument("--intrusive", action="store_true", help="Enable intrusive tests (SQLi/XSS)")
+    parser.add_argument("--version", action="version", version=f"vuln {__version__}")
+    args = parser.parse_args()
+
     try:
-        target = normalize_target(raw)
+        target = normalize_target(args.target)
     except Exception as e:
         print_err(f"Invalid target: {e}")
         sys.exit(1)
 
-    print_status(f"Resolved target: {target['host']} on port {target['port']}")
-    intrusive = input("Enable intrusive tests (will perform active payload checks)? (y/N): ").strip().lower() == "y"
-
-    mode = input("Scan mode - (1) Full scan, (2) Select modules: ").strip()
-    modules = []
-    if mode == "2":
-        print("Available modules:")
-        print("1. Port scan")
-        print("2. Service fingerprinting")
-        print("3. Web vulnerabilities")
-        print("4. SSL/TLS checks")
-        print("5. Header analysis")
-        print("6. Directory brute force")
-        print("7. CVE lookup")
-        picks = input("Enter comma-separated module numbers to run (e.g. 1,3,5): ")
-        for p in picks.split(","):
-            p = p.strip()
-            if p == "1": modules.append("port")
-            if p == "2": modules.append("fingerprint")
-            if p == "3": modules.append("webvuln")
-            if p == "4": modules.append("ssl")
-            if p == "5": modules.append("headers")
-            if p == "6": modules.append("dirbrute")
-            if p == "7": modules.append("cve")
-    else:
-        modules = ["port", "fingerprint", "webvuln", "ssl", "headers", "dirbrute", "cve"]
-
     report = {
-        "target": {"raw": raw, "host": target["host"], "port": target["port"], "url": target["url"]},
+        "target": {"raw": args.target, "host": target["host"], "port": target["port"], "url": target["url"]},
         "scan_time_utc": datetime.utcnow().isoformat() + "Z",
         "modules": {},
         "vulnerabilities": []
     }
 
-    # Port scan
-    port_results = {}
-    if "port" in modules:
+    # Run modules based on args.modules
+    if "port" in args.modules:
         r = run_module_safe("port_scan_socket", port_scan_socket, target["host"], DEFAULT_PORTS)
         report["modules"]["port_scan_socket"] = r
-        if r.get("status")=="ok":
-            port_results = r["result"]
-        else:
-            port_results = {}
+        port_results = r["result"] if r.get("status")=="ok" else {}
+    else:
+        port_results = {}
 
-    # Optional nmap (try to enrich)
-    if "port" in modules:
-        r2 = run_module_safe("port_scan_nmap", port_scan_nmap, target["host"])
-        report["modules"]["port_scan_nmap"] = r2
-
-    # Service fingerprinting
-    if "fingerprint" in modules:
+    if "fingerprint" in args.modules:
         r = run_module_safe("service_fingerprint", service_fingerprint, target, port_results)
         report["modules"]["service_fingerprint"] = r
-        # add findings to vulnerabilities if something suspicious in banners
-        if r.get("status")=="ok":
-            sf = r["result"]
-            for p, info in sf.items():
-                if isinstance(p, int) and info.get("banner"):
-                    b = info["banner"].lower()
-                    if "apache" in b:
-                        report["vulnerabilities"].append({"issue": "Apache server detected", "details": f"port {p} banner: {info['banner']}", "severity": "Low", "recommendation": "Keep server patched."})
 
-    # Header analysis
-    if "headers" in modules:
+    if "headers" in args.modules:
         r = run_module_safe("header_analysis", header_analysis, target["url"])
         report["modules"]["header_analysis"] = r
-        if r.get("status")=="ok":
-            ha = r["result"]
-            if ha.get("missing"):
-                for h in ha["missing"]:
-                    report["vulnerabilities"].append({"issue": "Missing security header", "details": h, "severity": "Medium", "recommendation": f"Implement {h} header."})
 
-    # SSL/TLS
-    if "ssl" in modules:
-        # choose port 443 or provided
-        ssl_port = 443 if target["port"] not in (443, 8443) else target["port"]
-        r = run_module_safe("ssl_scan", ssl_scan, target["host"], ssl_port)
+    if "ssl" in args.modules:
+        r = run_module_safe("ssl_scan", ssl_scan, target["host"], target["port"])
         report["modules"]["ssl_scan"] = r
-        if r.get("status")=="ok":
-            sres = r["result"]
-            if sres.get("expired"):
-                report["vulnerabilities"].append({"issue": "Expired TLS certificate", "details": sres.get("notAfter"), "severity": "High", "recommendation": "Renew certificate immediately."})
-            # old protocol support
-            for proto, sup in sres.get("protocol_support", {}).items():
-                if sup and proto in ("SSLv3","TLSv1"):
-                    report["vulnerabilities"].append({"issue": "Weak TLS/SSL protocol supported", "details": proto, "severity": "High", "recommendation": "Disable old/insecure protocols (use TLS1.2+)."})
-    # Web vulnerability checks
-    if "webvuln" in modules:
-        r = run_module_safe("basic_web_vuln_scan", basic_web_vuln_scan, target["url"], intrusive)
+
+    if "webvuln" in args.modules:
+        r = run_module_safe("basic_web_vuln_scan", basic_web_vuln_scan, target["url"], args.intrusive)
         report["modules"]["web_vuln_scan"] = r
-        if r.get("status")=="ok":
-            findings = r["result"].get("findings", [])
-            for f in findings:
-                report["vulnerabilities"].append(f)
 
-    # Directory brute force
-    if "dirbrute" in modules:
-        r = run_module_safe("dir_bruteforce", dir_bruteforce, target["url"], None, intrusive)
+    if "dirbrute" in args.modules:
+        r = run_module_safe("dir_bruteforce", dir_bruteforce, target["url"], None, args.intrusive)
         report["modules"]["dir_bruteforce"] = r
-        if r.get("status")=="ok":
-            discovered = r["result"].get("discovered", [])
-            for d in discovered:
-                report["vulnerabilities"].append({"issue": "Exposed resource", "details": d["path"], "severity": "Medium", "recommendation": "Remove or restrict access to sensitive files."})
 
-    # CVE lookup - use detected service names (best-effort)
-    if "cve" in modules:
-        service_names = []
-        sf_res = report["modules"].get("service_fingerprint", {})
-        sreq = sf_res.get("result", {}) if sf_res.get("status")=="ok" else {}
-        # gather some keywords
-        if isinstance(sreq, dict):
-            for k,v in sreq.items():
-                if isinstance(v, dict):
-                    banner = v.get("banner","")
-                    if banner:
-                        service_names += banner.split()
-            http_server = sreq.get("http_server_header")
-            if http_server:
-                service_names += http_server.split()
-        keywords = list(dict.fromkeys([s.strip().strip("/;,") for s in service_names if s]))
-        cve_results = {}
-        for kw in (keywords[:3] or [target["host"]]):
-            r = run_module_safe(f"cve_lookup:{kw}", cve_lookup, kw)
-            report["modules"].setdefault("cve_lookup", []).append(r)
-            if r.get("status")=="ok":
-                cve_results[kw] = r["result"]
-        report["modules"]["cve_summary"] = cve_results
+    if "cve" in args.modules:
+        r = run_module_safe("cve_lookup", cve_lookup, target["host"])
+        report["modules"]["cve_lookup"] = r
 
-    # Summarize findings and assign severities if missing
-    for v in report["vulnerabilities"]:
-        if "severity" not in v:
-            # simple heuristic placeholder
-            v["severity"] = "Medium"
-
-    # Build structured output
+    # Save and summarize
     structured = {
         "target_information": report["target"],
         "scan_time_utc": report["scan_time_utc"],
@@ -655,7 +566,6 @@ def main():
 
     fname = save_results(target["host"] + f"_{target['port']}", structured)
     print_ok(f"\nScan complete. Results saved to {fname}")
-    # print concise summary
     print_status("\nSummary:")
     if structured["vulnerabilities_found"]:
         for v in structured["vulnerabilities_found"]:
@@ -665,19 +575,6 @@ def main():
     else:
         print_ok("No issues found by current checks.")
 
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print_err("\nScan interrupted by user.")
-
-        sys.exit(1)
-
-from . import __version__
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--version", action="version", version=f"vuln {__version__}")
-    args = parser.parse_args()
     
+
 
