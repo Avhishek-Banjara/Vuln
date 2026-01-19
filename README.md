@@ -22,13 +22,13 @@ vuln --version
 
 # Modules
 The scanner is modular, meaning you can run all checks or select specific ones using the --modules option.
-.Port Scan
-. Service Fingerprint 
-. Web Vulnerability
-. SSL/TLS Checks
-. Header Analysis
-. Directory Brute Force
-. CVE Lookup
+Port Scan,
+ Service Fingerprint,
+ Web Vulnerability,
+ SSL/TLS Checks,
+ Header Analysis,
+ Directory Brute Force,
+ CVE Lookup
 
 # Run a full scan
 vuln https://example.com
