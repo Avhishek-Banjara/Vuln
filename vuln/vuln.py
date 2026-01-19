@@ -500,7 +500,6 @@ def save_results(target, results):
 from . import __version__
 
 def main():
-    def main():
     parser = argparse.ArgumentParser(
         prog="vuln",
         description="Advanced Vulnerability Scanner (educational use only).\n"
@@ -612,6 +611,7 @@ def main():
         print_ok("No issues found by current checks.")
 
     
+
 
 
 
